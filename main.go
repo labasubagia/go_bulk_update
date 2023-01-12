@@ -62,7 +62,7 @@ func ExecUser(opt Opt) error {
 	if err != nil {
 		return err
 	}
-	if err := mySQL.CreateBulk(table, payload); err != nil {
+	if err := mySQL.CreateBulk(table, payload, fieldSize); err != nil {
 		return err
 	}
 

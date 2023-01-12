@@ -29,7 +29,7 @@ func NewSQL(dataSourceName string, workerSize, batchSize int) (*SQL, error) {
 	return &sql, nil
 }
 
-func (s *SQL) CreateBulk(table string, data []map[string]any) error {
+func (s *SQL) CreateBulk(table string, data []map[string]any, fieldSize int) error {
 	if table == "" {
 		return errors.New("table is empty")
 	}
@@ -45,7 +45,7 @@ func (s *SQL) CreateBulk(table string, data []map[string]any) error {
 	sem := semaphore.NewWeighted(int64(s.workerSize))
 
 	size := len(data)
-	pageSize := utils.BulkUpdateMaxDataSize(size, 4*size)
+	pageSize := utils.BulkUpdateMaxDataSize(size, fieldSize*size)
 	paged := utils.PagedData(data, pageSize)
 
 	errors := make(chan error, len(paged))
@@ -67,7 +67,7 @@ func (s *SQL) CreateBulk(table string, data []map[string]any) error {
 			if err := create(pageNumber, data); err != nil {
 				errors <- err
 			}
-		}(index+1, page)
+		}(pageNumber, page)
 	}
 	if err := sem.Acquire(ctx, int64(s.workerSize)); err != nil {
 		return fmt.Errorf("error wait semaphore: %w", err)
