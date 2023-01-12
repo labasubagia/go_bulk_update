@@ -195,9 +195,9 @@ func (s *SQL) UpdateBulkManual(table string, data []map[string]any, keyEdits []s
 		if err := sem.Acquire(ctx, 1); err != nil {
 			return fmt.Errorf("error acquire semaphore: %w", err)
 		}
-		go func(pageNumber int, data map[string]any) {
+		go func(dataNumber int, data map[string]any) {
 			defer sem.Release(1)
-			if err := update(pageNumber, data); err != nil {
+			if err := update(dataNumber, data); err != nil {
 				errors <- err
 			}
 		}(index+1, item)
