@@ -17,6 +17,16 @@ type SQL struct {
 }
 
 func NewSQL(dataSourceName string, workerSize, batchSize int) (*SQL, error) {
+	if dataSourceName == "" {
+		return nil, errors.New("data source name is empty")
+	}
+	if workerSize <= 0 {
+		return nil, errors.New("worker size min 1")
+	}
+	if batchSize <= 0 {
+		return nil, errors.New("batch size min 1")
+	}
+
 	db, err := sqlx.Connect("mysql", dataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed connect database: %w", err)
@@ -35,6 +45,9 @@ func (s *SQL) CreateBulk(table string, data []map[string]any, fieldSize int) err
 	}
 	if len(data) == 0 {
 		return errors.New("data is empty")
+	}
+	if fieldSize <= 0 {
+		return errors.New("field size minimum 1")
 	}
 	query, _, err := utils.BulkCreateQuery(table, data[0])
 	if err != nil {
@@ -90,6 +103,9 @@ func (s *SQL) UpdateBulk(table string, data []map[string]any, keyEdits []string,
 	if len(keyEdits) == 0 {
 		return errors.New("key edits is empty")
 	}
+	if fieldSize <= 0 {
+		return errors.New("field size minimum 1")
+	}
 
 	ctx := context.Background()
 	sem := semaphore.NewWeighted(int64(s.workerSize))
@@ -118,16 +134,16 @@ func (s *SQL) UpdateBulk(table string, data []map[string]any, keyEdits []string,
 	}
 
 	for index, page := range paged {
-		no := index + 1
+		pageNumber := index + 1
 		if err := sem.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("error acquire semaphore on page %v: %w", no, err)
+			return fmt.Errorf("error acquire semaphore on page %v: %w", pageNumber, err)
 		}
-		go func(index int, data []map[string]any) {
+		go func(pageNumber int, data []map[string]any) {
 			defer sem.Release(1)
-			if err := update(no, data, keyEdits); err != nil {
+			if err := update(pageNumber, data, keyEdits); err != nil {
 				errors <- err
 			}
-		}(index, page)
+		}(pageNumber, page)
 	}
 	if err := sem.Acquire(ctx, int64(s.workerSize)); err != nil {
 		return fmt.Errorf("error wait semaphore: %w", err)
@@ -150,6 +166,9 @@ func (s *SQL) UpdateBulkManual(table string, data []map[string]any, keyEdits []s
 	}
 	if len(keyEdits) == 0 {
 		return errors.New("key edits is empty")
+	}
+	if fieldSize <= 0 {
+		return errors.New("field size minimum 1")
 	}
 
 	ctx := context.Background()
@@ -229,6 +248,9 @@ func (s *SQL) Update(table string, data, condition map[string]any) error {
 }
 
 func (s *SQL) EmptyTable(table string) error {
+	if table == "" {
+		return errors.New("table is empty")
+	}
 	query := fmt.Sprintf("DELETE FROM %s", table)
 	if _, err := s.db.Exec(query); err != nil {
 		return err
