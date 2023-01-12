@@ -14,6 +14,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+type Generator interface {
+	Table() string
+	FieldCount() int
+	GetCreate() []map[string]any
+	GetUpdate() []map[string]any
+}
+
 type User struct {
 	ID      int    `db:"id"`
 	Name    string `db:"name"`
@@ -21,25 +28,75 @@ type User struct {
 	Address string `db:"address"`
 }
 
+type userGenerator struct {
+	tag        string
+	dataCreate []User
+	dataUpdate []User
+}
+
+func NewUserGenerator(start, size int) Generator {
+	end := start + size
+
+	dataCreate := make([]User, 0, size)
+	dataUpdate := make([]User, 0, size)
+	for i := start; i < end; i++ {
+		dataCreate = append(dataCreate, User{
+			ID:      i,
+			Age:     10,
+			Name:    fmt.Sprintf("Name_%v", i),
+			Address: fmt.Sprintf("Addr_%v", i),
+		})
+		dataUpdate = append(dataUpdate, User{
+			ID:      i,
+			Age:     i,
+			Name:    fmt.Sprintf("Edited_Name_%v", i),
+			Address: fmt.Sprintf("Edited_Addr_%v", i),
+		})
+	}
+
+	return &userGenerator{
+		dataCreate: dataCreate,
+		dataUpdate: dataUpdate,
+		tag:        "db",
+	}
+}
+
+func (g *userGenerator) Table() string {
+	return "user"
+}
+
+func (g *userGenerator) FieldCount() int {
+	count, _ := utils.CountField(User{})
+	return count
+}
+
+func (g *userGenerator) GetCreate() []map[string]any {
+	data, _ := utils.StructsToMaps(g.dataCreate, g.tag)
+	return data
+}
+
+func (g *userGenerator) GetUpdate() []map[string]any {
+	data, _ := utils.StructsToMaps(g.dataCreate, g.tag)
+	return data
+}
+
 type Opt struct {
+	generator       Generator
+	dataSourceName  string
 	start, size     int
 	method          string
 	worker          int
 	updateBatchSize int
 	clearAtEnd      bool
+	keyEdits        []string
 }
 
-func ExecUser(opt Opt) error {
-	fieldSize, err := utils.CountField(User{})
-	if err != nil {
-		panic(err)
-	}
+func Exec(opt Opt) error {
 
-	data := []User{}
-	table := "user"
-	keyEdits := []string{"id"}
+	table := opt.generator.Table()
+	fieldSize := opt.generator.FieldCount()
 
-	mySQL, err := db.NewSQL("root:root@(localhost:3307)/test_db", opt.worker, opt.updateBatchSize)
+	mySQL, err := db.NewSQL(opt.dataSourceName, opt.worker, opt.updateBatchSize)
 	if err != nil {
 		return err
 	}
@@ -50,39 +107,20 @@ func ExecUser(opt Opt) error {
 	}
 
 	// Create
-	for i := opt.start; i < opt.start+opt.size; i++ {
-		data = append(data, User{
-			ID:      i,
-			Age:     10,
-			Name:    fmt.Sprintf("Name_%v", i),
-			Address: fmt.Sprintf("Addr_%v", i),
-		})
-	}
-	payload, err := utils.StructsToMaps(data, "db")
 	if err != nil {
 		return err
 	}
-	if err := mySQL.CreateBulk(table, payload, fieldSize); err != nil {
+	if err := mySQL.CreateBulk(table, opt.generator.GetCreate(), fieldSize); err != nil {
 		return err
 	}
 
 	// Update
-	for index := range data {
-		number := index + opt.start
-		data[index].Age = number
-		data[index].Name = fmt.Sprintf("NAME_%v", number)
-		data[index].Address = fmt.Sprintf("ADDR_%v", number)
-	}
-
+	// func fn(table string, data []map[string]any, keyEdits []string, fieldSize int) error
 	startTime := time.Now()
-	payload, err = utils.StructsToMaps(data, "db")
-	if err != nil {
-		return err
-	}
 	method := reflect.ValueOf(mySQL).MethodByName(opt.method)
 	params := []reflect.Value{}
-	for _, v := range []any{table, payload, keyEdits, fieldSize} {
-		params = append(params, reflect.ValueOf(v))
+	for _, param := range []any{table, opt.generator.GetUpdate(), opt.keyEdits, fieldSize} {
+		params = append(params, reflect.ValueOf(param))
 	}
 	result := method.Call(params)
 	if len(result) > 0 {
@@ -107,7 +145,7 @@ func main() {
 
 	start := 1
 
-	size := 1000
+	size := 10_000
 	if len(args) > 1 {
 		if n, err := strconv.Atoi(os.Args[1]); err == nil {
 			size = n
@@ -129,6 +167,8 @@ func main() {
 	}
 
 	clearAtEnd := false
+	dataSourceName := "root:root@(localhost:3307)/test_db"
+	keyEdits := []string{"id"}
 
 	log.Println("Start")
 	defer log.Println("Finish")
@@ -140,11 +180,14 @@ func main() {
 	}
 	for _, method := range methods {
 		opt := Opt{
+			generator:       NewUserGenerator(start, size),
+			dataSourceName:  dataSourceName,
 			method:          method,
 			start:           start,
 			size:            size,
 			worker:          worker,
 			updateBatchSize: updateBatchSize,
+			keyEdits:        keyEdits,
 			clearAtEnd:      clearAtEnd,
 		}
 		start += size
@@ -152,7 +195,7 @@ func main() {
 		wg.Add(1)
 		go func(opt Opt) {
 			defer wg.Done()
-			if err := ExecUser(opt); err != nil {
+			if err := Exec(opt); err != nil {
 				log.Println(err)
 			}
 		}(opt)

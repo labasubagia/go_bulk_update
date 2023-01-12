@@ -40,7 +40,7 @@ func StructsToMaps[T any](data []T, tag string) ([]map[string]any, error) {
 	if len(data) == 0 {
 		return empty, errors.New("data is empty")
 	}
-	result := []map[string]any{}
+	result := make([]map[string]any, 0, len(data))
 	for index, item := range data {
 		m, err := StructToMap(item, tag)
 		if err != nil {
