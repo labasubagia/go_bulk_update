@@ -11,9 +11,9 @@
             "mode": "debug",
             "program": "${workspaceFolder}",
             "args": [
-                "100",
-                "4",
-                "100"
+                "1000", // data size
+                "1", // worker
+                "100" // update bulk batch size
             ]
         }
     ]

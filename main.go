@@ -142,7 +142,7 @@ func main() {
 
 	start := 1
 
-	size := 10_000
+	size := 1000
 	if len(args) > 1 {
 		if n, err := strconv.Atoi(os.Args[1]); err == nil {
 			size = n
