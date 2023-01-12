@@ -107,9 +107,6 @@ func Exec(opt Opt) error {
 	}
 
 	// Create
-	if err != nil {
-		return err
-	}
 	if err := mySQL.CreateBulk(table, opt.generator.GetCreate(), fieldSize); err != nil {
 		return err
 	}
