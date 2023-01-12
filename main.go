@@ -76,7 +76,7 @@ func (g *userGenerator) GetCreate() []map[string]any {
 }
 
 func (g *userGenerator) GetUpdate() []map[string]any {
-	data, _ := utils.StructsToMaps(g.dataCreate, g.tag)
+	data, _ := utils.StructsToMaps(g.dataUpdate, g.tag)
 	return data
 }
 
