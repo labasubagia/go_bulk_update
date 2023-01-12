@@ -81,7 +81,7 @@ func BulkUpdateQuery(table string, data []map[string]any, keyEdits []string) (qu
 	return query, binds, nil
 }
 
-func BulkCreateQuery(table string, data map[string]any) (query string, binds map[string]any, err error) {
+func CreateQuery(table string, data map[string]any) (query string, binds map[string]any, err error) {
 	emptyBinds := map[string]any{}
 	if table == "" {
 		return "", emptyBinds, errors.New("table is empty")

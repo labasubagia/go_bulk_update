@@ -49,7 +49,7 @@ func (s *SQL) CreateBulk(table string, data []map[string]any, fieldSize int) err
 	if fieldSize <= 0 {
 		return errors.New("field size minimum 1")
 	}
-	query, _, err := utils.BulkCreateQuery(table, data[0])
+	query, _, err := utils.CreateQuery(table, data[0])
 	if err != nil {
 		return fmt.Errorf("failed build query %w", err)
 	}
