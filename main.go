@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"go_update_bulk/db"
-	"go_update_bulk/utils"
+	"go_update_bulk/generator"
 	"log"
 	"os"
 	"reflect"
@@ -14,74 +14,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type Generator interface {
-	Table() string
-	FieldCount() int
-	GetCreate() []map[string]any
-	GetUpdate() []map[string]any
-}
-
-type User struct {
-	ID      int    `db:"id"`
-	Name    string `db:"name"`
-	Age     int    `db:"age"`
-	Address string `db:"address"`
-}
-
-type userGenerator struct {
-	tag        string
-	dataCreate []User
-	dataUpdate []User
-}
-
-func NewUserGenerator(start, size int) Generator {
-	end := start + size
-
-	dataCreate := make([]User, 0, size)
-	dataUpdate := make([]User, 0, size)
-	for i := start; i < end; i++ {
-		dataCreate = append(dataCreate, User{
-			ID:      i,
-			Age:     10,
-			Name:    fmt.Sprintf("Name_%v", i),
-			Address: fmt.Sprintf("Addr_%v", i),
-		})
-		dataUpdate = append(dataUpdate, User{
-			ID:      i,
-			Age:     i,
-			Name:    fmt.Sprintf("Edited_Name_%v", i),
-			Address: fmt.Sprintf("Edited_Addr_%v", i),
-		})
-	}
-
-	return &userGenerator{
-		dataCreate: dataCreate,
-		dataUpdate: dataUpdate,
-		tag:        "db",
-	}
-}
-
-func (g *userGenerator) Table() string {
-	return "user"
-}
-
-func (g *userGenerator) FieldCount() int {
-	count, _ := utils.CountField(User{})
-	return count
-}
-
-func (g *userGenerator) GetCreate() []map[string]any {
-	data, _ := utils.StructsToMaps(g.dataCreate, g.tag)
-	return data
-}
-
-func (g *userGenerator) GetUpdate() []map[string]any {
-	data, _ := utils.StructsToMaps(g.dataUpdate, g.tag)
-	return data
-}
-
 type Opt struct {
-	generator       Generator
+	generator       generator.Generator
 	dataSourceName  string
 	start, size     int
 	method          string
@@ -89,6 +23,7 @@ type Opt struct {
 	updateBatchSize int
 	clearAtEnd      bool
 	keyEdits        []string
+	tag             string
 }
 
 func Exec(opt Opt) error {
@@ -116,6 +51,7 @@ func Exec(opt Opt) error {
 	startTime := time.Now()
 	method := reflect.ValueOf(mySQL).MethodByName(opt.method)
 	params := []reflect.Value{}
+
 	for _, param := range []any{table, opt.generator.GetUpdate(), opt.keyEdits, fieldSize} {
 		params = append(params, reflect.ValueOf(param))
 	}
@@ -177,7 +113,7 @@ func main() {
 	}
 	for _, method := range methods {
 		opt := Opt{
-			generator:       NewUserGenerator(start, size),
+			generator:       generator.NewUserGenerator(start, size),
 			dataSourceName:  dataSourceName,
 			method:          method,
 			start:           start,
