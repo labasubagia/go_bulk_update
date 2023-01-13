@@ -10,13 +10,22 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-type SQL struct {
+type SQL interface {
+	CreateBulk(table string, data []map[string]any, fieldSize int) error
+	UpdateBulk(table string, data []map[string]any, keyEdits []string, fieldSize int) error
+	UpdateBulkManual(table string, data []map[string]any, keyEdits []string, fieldSize int) error
+	Update(table string, data, condition map[string]any) error
+	EmptyTable(table string) error
+	Close() error
+}
+
+type sql struct {
 	db         *sqlx.DB
 	workerSize int
 	batchSize  int
 }
 
-func NewSQL(dataSourceName string, workerSize, batchSize int) (*SQL, error) {
+func NewSQL(dataSourceName string, workerSize, batchSize int) (SQL, error) {
 	if dataSourceName == "" {
 		return nil, errors.New("data source name is empty")
 	}
@@ -31,7 +40,7 @@ func NewSQL(dataSourceName string, workerSize, batchSize int) (*SQL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed connect database: %w", err)
 	}
-	sql := SQL{
+	sql := sql{
 		db:         db,
 		workerSize: workerSize,
 		batchSize:  batchSize,
@@ -39,7 +48,7 @@ func NewSQL(dataSourceName string, workerSize, batchSize int) (*SQL, error) {
 	return &sql, nil
 }
 
-func (s *SQL) CreateBulk(table string, data []map[string]any, fieldSize int) error {
+func (s *sql) CreateBulk(table string, data []map[string]any, fieldSize int) error {
 	if table == "" {
 		return errors.New("table is empty")
 	}
@@ -93,7 +102,7 @@ func (s *SQL) CreateBulk(table string, data []map[string]any, fieldSize int) err
 	return nil
 }
 
-func (s *SQL) UpdateBulk(table string, data []map[string]any, keyEdits []string, fieldSize int) error {
+func (s *sql) UpdateBulk(table string, data []map[string]any, keyEdits []string, fieldSize int) error {
 	if table == "" {
 		return errors.New("table is empty")
 	}
@@ -157,7 +166,7 @@ func (s *SQL) UpdateBulk(table string, data []map[string]any, keyEdits []string,
 	return nil
 }
 
-func (s *SQL) UpdateBulkManual(table string, data []map[string]any, keyEdits []string, fieldSize int) error {
+func (s *sql) UpdateBulkManual(table string, data []map[string]any, keyEdits []string, fieldSize int) error {
 	if table == "" {
 		return errors.New("table is empty")
 	}
@@ -214,7 +223,7 @@ func (s *SQL) UpdateBulkManual(table string, data []map[string]any, keyEdits []s
 	return nil
 }
 
-func (s *SQL) Update(table string, data, condition map[string]any) error {
+func (s *sql) Update(table string, data, condition map[string]any) error {
 	if table == "" {
 		return errors.New("table is empty")
 	}
@@ -247,7 +256,7 @@ func (s *SQL) Update(table string, data, condition map[string]any) error {
 	return nil
 }
 
-func (s *SQL) EmptyTable(table string) error {
+func (s *sql) EmptyTable(table string) error {
 	if table == "" {
 		return errors.New("table is empty")
 	}
@@ -256,4 +265,8 @@ func (s *SQL) EmptyTable(table string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *sql) Close() error {
+	return s.db.Close()
 }

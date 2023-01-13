@@ -14,42 +14,32 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type Opt struct {
-	generator       generator.Generator
-	dataSourceName  string
-	start, size     int
-	method          string
-	worker          int
-	updateBatchSize int
-	clearAtEnd      bool
-	keyEdits        []string
-	tag             string
+type BulkUpdateOption struct {
+	generator  generator.Generator
+	method     string
+	clearAtEnd bool
+	keyEdits   []string
 }
 
-func Exec(opt Opt) error {
+func ExecBulkUpdate(sql db.SQL, opt BulkUpdateOption) error {
 
 	table := opt.generator.Table()
 	fieldSize := opt.generator.FieldCount()
 
-	mySQL, err := db.NewSQL(opt.dataSourceName, opt.worker, opt.updateBatchSize)
-	if err != nil {
-		return err
-	}
-
 	// Clear
-	if err := mySQL.EmptyTable(table); err != nil {
+	if err := sql.EmptyTable(table); err != nil {
 		return err
 	}
 
 	// Create
-	if err := mySQL.CreateBulk(table, opt.generator.GetCreate(), fieldSize); err != nil {
+	if err := sql.CreateBulk(table, opt.generator.GetCreate(), fieldSize); err != nil {
 		return err
 	}
 
 	// Update
 	// func fn(table string, data []map[string]any, keyEdits []string, fieldSize int) error
 	startTime := time.Now()
-	method := reflect.ValueOf(mySQL).MethodByName(opt.method)
+	method := reflect.ValueOf(sql).MethodByName(opt.method)
 	params := []reflect.Value{}
 
 	for _, param := range []any{table, opt.generator.GetUpdate(), opt.keyEdits, fieldSize} {
@@ -62,11 +52,11 @@ func Exec(opt Opt) error {
 		}
 	}
 	elapsed := time.Since(startTime)
-	log.Printf("%v with %v data took %vs\n", opt.method, opt.size, elapsed.Seconds())
+	log.Printf("%v with %v data took %vs\n", opt.method, opt.generator.TotalData(), elapsed.Seconds())
 
 	// Clear
 	if opt.clearAtEnd {
-		if err := mySQL.EmptyTable(table); err != nil {
+		if err := sql.EmptyTable(table); err != nil {
 			return err
 		}
 	}
@@ -106,29 +96,33 @@ func main() {
 	log.Println("Start")
 	defer log.Println("Finish")
 
+	// Connect database
+	sql, err := db.NewSQL(dataSourceName, worker, updateBatchSize)
+	if err != nil {
+		panic(err)
+	}
+	defer sql.Close()
+
 	var wg sync.WaitGroup
 	methods := []string{
 		"UpdateBulkManual",
 		"UpdateBulk",
 	}
+
 	for _, method := range methods {
-		opt := Opt{
-			generator:       generator.NewUserGenerator(start, size),
-			dataSourceName:  dataSourceName,
-			method:          method,
-			start:           start,
-			size:            size,
-			worker:          worker,
-			updateBatchSize: updateBatchSize,
-			keyEdits:        keyEdits,
-			clearAtEnd:      clearAtEnd,
+		gen := generator.NewGenerator(start, size, generator.NewUserDump(), "db")
+		opt := BulkUpdateOption{
+			generator:  gen,
+			method:     method,
+			keyEdits:   keyEdits,
+			clearAtEnd: clearAtEnd,
 		}
 		start += size
 
 		wg.Add(1)
-		go func(opt Opt) {
+		go func(opt BulkUpdateOption) {
 			defer wg.Done()
-			if err := Exec(opt); err != nil {
+			if err := ExecBulkUpdate(sql, opt); err != nil {
 				log.Println(err)
 			}
 		}(opt)
