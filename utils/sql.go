@@ -65,19 +65,19 @@ func BulkUpdateQuery(table string, data []map[string]any, keyEdits []string) (qu
 		for _, key := range keyEdits {
 			value, ok := item[key]
 			if !ok {
-				return "", emptyBinds, fmt.Errorf("key '%v' found in the data number %v: %v", key, index+1, item)
+				return "", emptyBinds, fmt.Errorf("key '%s' found in the data number %d", key, index+1)
 			}
-			bindKey := fmt.Sprintf("%v_%v", key, index)
-			condition = append(condition, fmt.Sprintf("%v = :%v", key, bindKey))
-			conditions[key] = append(conditions[key], fmt.Sprintf(":%v", bindKey))
+			bindKey := fmt.Sprintf("%s_%d", key, index)
+			condition = append(condition, fmt.Sprintf("%s = :%s", key, bindKey))
+			conditions[key] = append(conditions[key], fmt.Sprintf(":%s", bindKey))
 			binds[bindKey] = value
 			delete(item, key)
 		}
 
 		for key, value := range item {
-			bindKey := fmt.Sprintf("%v_%v", key, index)
+			bindKey := fmt.Sprintf("%s_%d", key, index)
 			binds[bindKey] = value
-			columns[key] = fmt.Sprintf("%s WHEN %s THEN %v", columns[key], strings.Join(condition, " AND "), fmt.Sprintf(":%v", bindKey))
+			columns[key] = fmt.Sprintf("%s WHEN %s THEN %s", columns[key], strings.Join(condition, " AND "), fmt.Sprintf(":%s", bindKey))
 		}
 	}
 

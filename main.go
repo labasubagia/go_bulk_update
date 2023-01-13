@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"go_update_bulk/db"
 	"go_update_bulk/generator"
 	"log"
@@ -48,11 +47,11 @@ func ExecBulkUpdate(sql db.SQL, opt BulkUpdateOption) error {
 	result := method.Call(params)
 	if len(result) > 0 {
 		if err := result[0].Interface(); err != nil {
-			return fmt.Errorf("%v", err)
+			return err.(error)
 		}
 	}
 	elapsed := time.Since(startTime)
-	log.Printf("%v with %v data took %vs\n", opt.method, opt.generator.TotalData(), elapsed.Seconds())
+	log.Printf("%s with %d data took %fs\n", opt.method, opt.generator.TotalData(), elapsed.Seconds())
 
 	// Clear
 	if opt.clearAtEnd {
@@ -75,7 +74,7 @@ func main() {
 		}
 	}
 
-	worker := 1
+	worker := 2
 	if len(args) > 2 {
 		if n, err := strconv.Atoi(os.Args[2]); err == nil {
 			worker = n
@@ -105,7 +104,8 @@ func main() {
 
 	var wg sync.WaitGroup
 	methods := []string{
-		"UpdateBulkManual",
+		"UpdateSequential",
+		"UpdateParallel",
 		"UpdateBulk",
 	}
 
@@ -128,5 +128,4 @@ func main() {
 		}(opt)
 	}
 	wg.Wait()
-
 }

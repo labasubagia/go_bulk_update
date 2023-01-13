@@ -44,7 +44,7 @@ func StructsToMaps[T any](data []T, tag string) ([]map[string]any, error) {
 	for index, item := range data {
 		m, err := StructToMap(item, tag)
 		if err != nil {
-			return empty, fmt.Errorf("failed convert data %v: %w", index, err)
+			return empty, fmt.Errorf("failed convert data %d: %w", index, err)
 		}
 		result = append(result, m)
 	}

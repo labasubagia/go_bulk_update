@@ -11,9 +11,11 @@ import (
 )
 
 type SQL interface {
+	DB() *sqlx.DB
 	CreateBulk(table string, data []map[string]any, fieldSize int) error
 	UpdateBulk(table string, data []map[string]any, keyEdits []string, fieldSize int) error
-	UpdateBulkManual(table string, data []map[string]any, keyEdits []string, fieldSize int) error
+	UpdateParallel(table string, data []map[string]any, keyEdits []string, fieldSize int) error
+	UpdateSequential(table string, data []map[string]any, keyEdits []string, fieldSize int) error
 	Update(table string, data, condition map[string]any) error
 	EmptyTable(table string) error
 	Close() error
@@ -48,6 +50,10 @@ func NewSQL(dataSourceName string, workerSize, batchSize int) (SQL, error) {
 	return &sql, nil
 }
 
+func (s *sql) DB() *sqlx.DB {
+	return s.db
+}
+
 func (s *sql) CreateBulk(table string, data []map[string]any, fieldSize int) error {
 	if table == "" {
 		return errors.New("table is empty")
@@ -74,7 +80,7 @@ func (s *sql) CreateBulk(table string, data []map[string]any, fieldSize int) err
 
 	create := func(pageNumber int, data []map[string]any) error {
 		if _, err = s.db.NamedExec(query, data); err != nil {
-			return fmt.Errorf("error when create page %v: %w", pageNumber, err)
+			return fmt.Errorf("error when create page %d: %w", pageNumber, err)
 		}
 		return nil
 	}
@@ -82,7 +88,7 @@ func (s *sql) CreateBulk(table string, data []map[string]any, fieldSize int) err
 	for index, page := range paged {
 		pageNumber := index + 1
 		if err := sem.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("error acquire semaphore on page %v: %w", pageNumber, err)
+			return fmt.Errorf("error acquire semaphore on page %d: %w", pageNumber, err)
 		}
 		go func(pageNumber int, data []map[string]any) {
 			defer sem.Release(1)
@@ -134,10 +140,10 @@ func (s *sql) UpdateBulk(table string, data []map[string]any, keyEdits []string,
 	update := func(pageNumber int, data []map[string]any, keyEdit []string) error {
 		query, binds, err := utils.BulkUpdateQuery(table, data, keyEdit)
 		if err != nil {
-			return fmt.Errorf("failed to build query %v: %w", pageNumber, err)
+			return fmt.Errorf("failed to build query %d: %w", pageNumber, err)
 		}
 		if _, err := s.db.NamedExec(query, binds); err != nil {
-			return fmt.Errorf("error when update page %v: %w", pageNumber, err)
+			return fmt.Errorf("error when update page %d: %w", pageNumber, err)
 		}
 		return nil
 	}
@@ -145,7 +151,7 @@ func (s *sql) UpdateBulk(table string, data []map[string]any, keyEdits []string,
 	for index, page := range paged {
 		pageNumber := index + 1
 		if err := sem.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("error acquire semaphore on page %v: %w", pageNumber, err)
+			return fmt.Errorf("error acquire semaphore on page %d: %w", pageNumber, err)
 		}
 		go func(pageNumber int, data []map[string]any) {
 			defer sem.Release(1)
@@ -166,7 +172,7 @@ func (s *sql) UpdateBulk(table string, data []map[string]any, keyEdits []string,
 	return nil
 }
 
-func (s *sql) UpdateBulkManual(table string, data []map[string]any, keyEdits []string, fieldSize int) error {
+func (s *sql) UpdateParallel(table string, data []map[string]any, keyEdits []string, fieldSize int) error {
 	if table == "" {
 		return errors.New("table is empty")
 	}
@@ -189,13 +195,13 @@ func (s *sql) UpdateBulkManual(table string, data []map[string]any, keyEdits []s
 		for _, key := range keyEdits {
 			value, ok := data[key]
 			if !ok {
-				return fmt.Errorf("data %v not have '%v' property", dataNumber, key)
+				return fmt.Errorf("data %d not have '%s' property", dataNumber, key)
 			}
 			condition[key] = value
 			delete(data, key)
 		}
 		if err := s.Update(table, data, condition); err != nil {
-			return fmt.Errorf("error when update page %v: %w", dataNumber, err)
+			return fmt.Errorf("error when update page %d: %w", dataNumber, err)
 		}
 		return nil
 	}
@@ -218,6 +224,45 @@ func (s *sql) UpdateBulkManual(table string, data []map[string]any, keyEdits []s
 	close(errors)
 	for err := range errors {
 		return err
+	}
+
+	return nil
+}
+
+func (s *sql) UpdateSequential(table string, data []map[string]any, keyEdits []string, fieldSize int) error {
+	if table == "" {
+		return errors.New("table is empty")
+	}
+	if len(data) == 0 {
+		return errors.New("data is empty")
+	}
+	if len(keyEdits) == 0 {
+		return errors.New("key edits is empty")
+	}
+	if fieldSize <= 0 {
+		return errors.New("field size minimum 1")
+	}
+
+	update := func(dataNumber int, data map[string]any) error {
+		condition := map[string]any{}
+		for _, key := range keyEdits {
+			value, ok := data[key]
+			if !ok {
+				return fmt.Errorf("data %d not have '%s' property", dataNumber, key)
+			}
+			condition[key] = value
+			delete(data, key)
+		}
+		if err := s.Update(table, data, condition); err != nil {
+			return fmt.Errorf("error when update page %d: %w", dataNumber, err)
+		}
+		return nil
+	}
+
+	for index, item := range data {
+		if err := update(index+1, item); err != nil {
+			return err
+		}
 	}
 
 	return nil

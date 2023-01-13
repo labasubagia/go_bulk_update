@@ -92,7 +92,7 @@ func TestBulkUpdateQuery(t *testing.T) {
 		}
 
 		for index, testCase := range testCases {
-			t.Run(fmt.Sprintf("TestCase %v", index+1), func(t *testing.T) {
+			t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
 				query, binds, err := BulkUpdateQuery(testCase.table, testCase.data, testCase.keyEdit)
 				assert.Equal(t, UglifyQuery(testCase.query), UglifyQuery(query))
 				assert.Equal(t, testCase.binds, binds)
@@ -130,7 +130,7 @@ func TestBulkUpdateQuery(t *testing.T) {
 			},
 		}
 		for index, testCase := range testCases {
-			t.Run(fmt.Sprintf("TestCase %v", index+1), func(t *testing.T) {
+			t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
 				_, _, err := BulkUpdateQuery(testCase.table, testCase.data, testCase.keyEdit)
 				assert.NotNil(t, err)
 			})
