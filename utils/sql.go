@@ -10,8 +10,29 @@ import (
 	"strings"
 )
 
+// MaxPlaceholder is the maximum limit SQL placeholder
+//
+// In this utils will set default to max uint16 (65535) for MySQL (database that I currently use)
 const MaxPlaceholder = math.MaxUint16
 
+// BulkMaxDataSize is maximum data can inserted in one SQL query based on length of data and maximum placeholder size
+//
+// dataSize is length of data
+//
+// for CreateBulk, totalField usually struct/map length * dataSize
+//
+// for UpdateBulk, totalField using BulkUpdateEstimateTotalField method
+func BulkMaxDataSize(dataSize, totalField int) int {
+	return int(float64(dataSize) * float64(MaxPlaceholder) / float64(totalField))
+}
+
+// BulkUpdateEstimateTotalField is to count estimated all of fields/placeholders that created in BulkUpdateQuery
+//
+// dataSize is length of data
+//
+// fieldSize is length of struct/map
+//
+// conditionSize is length of how many field that used as condition
 func BulkUpdateEstimateTotalField(dataSize, fieldSize, conditionSize int) int {
 	eachFieldInput := fieldSize - conditionSize
 	fields := eachFieldInput * dataSize
@@ -20,10 +41,9 @@ func BulkUpdateEstimateTotalField(dataSize, fieldSize, conditionSize int) int {
 	return fields + fieldCondition + whereCondition
 }
 
-func BulkUpdateMaxDataSize(dataSize, totalField int) int {
-	return int(float64(dataSize) * float64(MaxPlaceholder) / float64(totalField))
-}
-
+// BulkUpdateQuery to build bulk update data SQL in single query
+//
+// keyEdits is key that used as conditional e.g []string{"id"}
 func BulkUpdateQuery(table string, data []map[string]any, keyEdits []string) (query string, binds map[string]any, err error) {
 	emptyBinds := map[string]any{}
 	if table == "" {
@@ -81,6 +101,7 @@ func BulkUpdateQuery(table string, data []map[string]any, keyEdits []string) (qu
 	return query, binds, nil
 }
 
+// CreateQuery is used to build create query
 func CreateQuery(table string, data map[string]any) (query string, binds map[string]any, err error) {
 	emptyBinds := map[string]any{}
 	if table == "" {
@@ -109,6 +130,7 @@ func CreateQuery(table string, data map[string]any) (query string, binds map[str
 	return query, binds, nil
 }
 
+// UpdateQuery to build update data query
 func UpdateQuery(table string, payload, condition map[string]any) (query string, binds map[string]any, err error) {
 	empty := map[string]any{}
 	if table == "" {
@@ -151,6 +173,9 @@ func UpdateQuery(table string, payload, condition map[string]any) (query string,
 	return query, binds, nil
 }
 
+// ConditionQuery is used to build conditional query in mysql
+//
+// e.g. WHERE id=:cond_id AND name=:cond_name
 func ConditionQuery(condition map[string]any) (query string, binds map[string]any, err error) {
 	if len(condition) == 0 {
 		return "", map[string]any{}, errors.New("condition is empty")
@@ -177,8 +202,11 @@ func ConditionQuery(condition map[string]any) (query string, binds map[string]an
 	return strings.Join(cond, " AND "), binds, err
 }
 
-// write query using this format
-// https://extendsclass.com/sql-validator.html
+// UglifyQuery is used to remove all formatting from a query
+//
+// can be used in testing
+//
+// write query using this format https://extendsclass.com/sql-validator.html
 func UglifyQuery(query string) string {
 	matcher := regexp.MustCompile(`[\t|\n]+|\s\s+`)
 	query = matcher.ReplaceAllString(query, " ")

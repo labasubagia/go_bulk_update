@@ -58,7 +58,7 @@ func (s *SQL) CreateBulk(table string, data []map[string]any, fieldSize int) err
 	sem := semaphore.NewWeighted(int64(s.workerSize))
 
 	size := len(data)
-	pageSize := utils.BulkUpdateMaxDataSize(size, fieldSize*size)
+	pageSize := utils.BulkMaxDataSize(size, fieldSize*size)
 	paged := utils.PagedData(data, pageSize)
 
 	errors := make(chan error, len(paged))
@@ -114,7 +114,7 @@ func (s *SQL) UpdateBulk(table string, data []map[string]any, keyEdits []string,
 	totalField := utils.BulkUpdateEstimateTotalField(len(data), fieldSize, len(keyEdits))
 
 	pageSize := s.batchSize
-	calculatedPageSize := utils.BulkUpdateMaxDataSize(size, totalField)
+	calculatedPageSize := utils.BulkMaxDataSize(size, totalField)
 	if calculatedPageSize < pageSize {
 		pageSize = calculatedPageSize
 	}
