@@ -12,7 +12,7 @@
             "program": "${workspaceFolder}",
             "args": [
                 "1000", // data size
-                "1", // worker
+                "2", // worker
                 "100" // update bulk batch size
             ]
         }
