@@ -21,7 +21,7 @@ func StructToMap(payload any, tag string, removeNil bool) (map[string]any, error
 
 		fieldName := typeField.Tag.Get(tag)
 		if fieldName == "" {
-			continue
+			fieldName = typeField.Name
 		}
 
 		// Get pointer value
@@ -37,7 +37,6 @@ func StructToMap(payload any, tag string, removeNil bool) (map[string]any, error
 
 		}
 		result[fieldName] = valueField.Interface()
-
 	}
 	return result, nil
 }
