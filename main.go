@@ -110,7 +110,7 @@ func main() {
 	}
 
 	for _, method := range methods {
-		gen := generator.NewGenerator(start, size, generator.NewUserDump(), "db")
+		gen := generator.NewGenerator(start, size, generator.NewUserDump(), "db", true)
 		opt := BulkUpdateOption{
 			generator:  gen,
 			method:     method,

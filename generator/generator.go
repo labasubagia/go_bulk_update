@@ -25,9 +25,10 @@ type generator[T any] struct {
 	size       int
 	dataCreate []T
 	dataUpdate []T
+	removeNil  bool
 }
 
-func NewGenerator[T any](start, size int, typ GenerateDump[T], tag string) Generator {
+func NewGenerator[T any](start, size int, typ GenerateDump[T], tag string, removeNil bool) Generator {
 	end := start + size
 
 	dataCreate := make([]T, 0, size)
@@ -43,6 +44,7 @@ func NewGenerator[T any](start, size int, typ GenerateDump[T], tag string) Gener
 		tag:        tag,
 		typ:        typ,
 		size:       size,
+		removeNil:  removeNil,
 	}
 }
 
@@ -60,11 +62,11 @@ func (g *generator[T]) FieldCount() int {
 }
 
 func (g *generator[T]) GetCreate() []map[string]any {
-	data, _ := utils.StructsToMaps(g.dataCreate, g.tag)
+	data, _ := utils.StructsToMaps(g.dataCreate, g.tag, g.removeNil)
 	return data
 }
 
 func (g *generator[T]) GetUpdate() []map[string]any {
-	data, _ := utils.StructsToMaps(g.dataUpdate, g.tag)
+	data, _ := utils.StructsToMaps(g.dataUpdate, g.tag, g.removeNil)
 	return data
 }

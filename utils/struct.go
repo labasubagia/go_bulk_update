@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-func StructToMap(payload any, tag string) (map[string]any, error) {
+func StructToMap(payload any, tag string, removeNil bool) (map[string]any, error) {
 	result := map[string]any{}
 	v := reflect.ValueOf(payload)
 	if tag == "" {
@@ -24,25 +24,32 @@ func StructToMap(payload any, tag string) (map[string]any, error) {
 			continue
 		}
 
+		// Get pointer value
+		// Or get rid of fit
 		if valueField.Kind() == reflect.Ptr {
 			if valueField.IsNil() {
-				continue
+				if removeNil {
+					continue
+				}
+			} else {
+				valueField = valueField.Elem()
 			}
-			valueField = valueField.Elem()
+
 		}
 		result[fieldName] = valueField.Interface()
+
 	}
 	return result, nil
 }
 
-func StructsToMaps[T any](data []T, tag string) ([]map[string]any, error) {
+func StructsToMaps[T any](data []T, tag string, removeNil bool) ([]map[string]any, error) {
 	empty := []map[string]any{}
 	if len(data) == 0 {
 		return empty, errors.New("data is empty")
 	}
 	result := make([]map[string]any, 0, len(data))
 	for index, item := range data {
-		m, err := StructToMap(item, tag)
+		m, err := StructToMap(item, tag, removeNil)
 		if err != nil {
 			return empty, fmt.Errorf("failed convert data %d: %w", index, err)
 		}
