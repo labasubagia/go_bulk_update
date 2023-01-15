@@ -9,9 +9,6 @@ import (
 func StructToMap(payload any, tag string, removeNil bool) (map[string]any, error) {
 	result := map[string]any{}
 	v := reflect.ValueOf(payload)
-	if tag == "" {
-		return result, errors.New("tag is required")
-	}
 	if v.Kind() != reflect.Struct {
 		return result, errors.New("payload need to be struct")
 	}
@@ -58,7 +55,7 @@ func StructsToMaps[T any](data []T, tag string, removeNil bool) ([]map[string]an
 }
 
 func CountField(input any) (int, error) {
-	if reflect.TypeOf(input).Kind() != reflect.Struct {
+	if input == nil || reflect.TypeOf(input).Kind() != reflect.Struct {
 		return 0, errors.New("input not struct")
 	}
 	return reflect.ValueOf(input).NumField(), nil
