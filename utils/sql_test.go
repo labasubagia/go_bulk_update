@@ -218,3 +218,52 @@ func TestCreateQuery(t *testing.T) {
 		assert.NotNil(t, err)
 	})
 }
+
+func TestUpdateQuery(t *testing.T) {
+	type testCase struct {
+		table     string
+		field     map[string]any
+		condition map[string]any
+		query     string
+		bind      map[string]any
+	}
+
+	t.Run("success", func(t *testing.T) {
+		testCases := []testCase{
+			{
+				table:     "table",
+				field:     map[string]any{"f1": "1", "f2": "2"},
+				condition: map[string]any{"c1": 1, "c2": 2},
+				query:     "UPDATE table SET f1=:val_f1, f2=:val_f2 WHERE c1=:cond_c1 AND c2=:cond_c2",
+				bind:      map[string]any{"val_f1": "1", "val_f2": "2", "cond_c1": 1, "cond_c2": 2},
+			},
+			{
+				table:     "table",
+				field:     map[string]any{"f1": "1", "f2": "2"},
+				condition: map[string]any{"f1": 1, "f2": 2},
+				query:     "UPDATE table SET f1=:val_f1, f2=:val_f2 WHERE f1=:cond_f1 AND f2=:cond_f2",
+				bind:      map[string]any{"val_f1": "1", "val_f2": "2", "cond_f1": 1, "cond_f2": 2},
+			},
+		}
+
+		for index, testCase := range testCases {
+			t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
+				query, bind, err := UpdateQuery(testCase.table, testCase.field, testCase.condition)
+				assert.Nil(t, err)
+				assert.Equal(t, UglifyQuery(testCase.query), UglifyQuery(query))
+				assert.Equal(t, testCase.bind, bind)
+			})
+		}
+	})
+
+	t.Run("failed", func(t *testing.T) {
+		_, _, err := UpdateQuery("", map[string]any{"f1": 1}, map[string]any{"c1": 1})
+		assert.NotNil(t, err)
+
+		_, _, err = UpdateQuery("table", map[string]any{}, map[string]any{"c1": 1})
+		assert.NotNil(t, err)
+
+		_, _, err = UpdateQuery("table", map[string]any{"f1": 1}, map[string]any{})
+		assert.NotNil(t, err)
+	})
+}

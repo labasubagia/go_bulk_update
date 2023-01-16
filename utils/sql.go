@@ -146,9 +146,6 @@ func UpdateQuery(table string, payload, condition map[string]any) (query string,
 	// Field
 	binds = map[string]any{}
 	fields := []string{}
-	if err != nil {
-		return query, binds, fmt.Errorf("failed to build update query, make fields: %w", err)
-	}
 	for _, key := range SortMapKeys(payload) {
 		keyBind := fmt.Sprintf("val_%s", key)
 		val := payload[key]
