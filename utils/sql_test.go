@@ -174,3 +174,47 @@ func TestBulkUpdateQuery(t *testing.T) {
 	})
 
 }
+
+func TestCreateQuery(t *testing.T) {
+	type testCase struct {
+		table string
+		data  map[string]any
+		query string
+		bind  map[string]any
+	}
+
+	t.Run("success", func(t *testing.T) {
+
+		testCases := []testCase{
+			{
+				table: "user",
+				data:  map[string]any{"id": 1, "name": "John", "address": "Australia"},
+				query: "INSERT INTO user (address, id, name) VALUES (:address, :id, :name)",
+				bind:  map[string]any{"id": 1, "name": "John", "address": "Australia"},
+			},
+			{
+				table: "product",
+				data:  map[string]any{"id": 1, "name": "Mouse", "qty": 2},
+				query: "INSERT INTO product (id, name, qty) VALUES (:id, :name, :qty)",
+				bind:  map[string]any{"id": 1, "name": "Mouse", "qty": 2},
+			},
+		}
+
+		for index, testCase := range testCases {
+			t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
+				query, bind, err := CreateQuery(testCase.table, testCase.data)
+				assert.Nil(t, err)
+				assert.Equal(t, UglifyQuery(testCase.query), UglifyQuery(query))
+				assert.Equal(t, testCase.bind, bind)
+			})
+		}
+	})
+
+	t.Run("fail", func(t *testing.T) {
+		_, _, err := CreateQuery("", map[string]any{"id": 1})
+		assert.NotNil(t, err)
+
+		_, _, err = CreateQuery("table", map[string]any{})
+		assert.NotNil(t, err)
+	})
+}
