@@ -7,6 +7,42 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestBulkMaxDataSize(t *testing.T) {
+	type testCase struct {
+		dataSize, totalField, expected int
+	}
+
+	testCases := []testCase{
+		{dataSize: 10, totalField: 4 * 10, expected: 16383},
+		{dataSize: 20, totalField: 4 * 20, expected: 16383},
+	}
+
+	for index, testCase := range testCases {
+		t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
+			actual := BulkMaxDataSize(testCase.dataSize, testCase.totalField)
+			assert.Equal(t, testCase.expected, actual)
+		})
+	}
+}
+
+func TestBulkUpdateEstimateTotalField(t *testing.T) {
+	type testCase struct {
+		dataSize, fieldSize, conditionSize, expected int
+	}
+
+	testCases := []testCase{
+		{dataSize: 10, fieldSize: 4, conditionSize: 1, expected: 70},
+		{dataSize: 2, fieldSize: 4, conditionSize: 1, expected: 14},
+	}
+
+	for index, testCase := range testCases {
+		t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
+			actual := BulkUpdateEstimateTotalField(testCase.dataSize, testCase.fieldSize, testCase.conditionSize)
+			assert.Equal(t, testCase.expected, actual)
+		})
+	}
+}
+
 func TestBulkUpdateQuery(t *testing.T) {
 
 	type testCase struct {
