@@ -351,5 +351,8 @@ func TestConditionQuery(t *testing.T) {
 	t.Run("failed", func(t *testing.T) {
 		_, _, err := ConditionQuery(map[string]any{})
 		assert.NotNil(t, err)
+
+		_, _, err = ConditionQuery(map[string]any{"ids": []int{}})
+		assert.NotNil(t, err)
 	})
 }

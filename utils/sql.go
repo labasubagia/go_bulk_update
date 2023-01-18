@@ -215,7 +215,13 @@ func ConditionQuery(condition map[string]any) (query string, binds map[string]an
 		cond = append(cond, str)
 		binds[bindKey] = val
 	}
-	return strings.Join(cond, " AND "), binds, err
+
+	query = strings.TrimSpace(strings.Join(cond, " AND "))
+	if query == "" {
+		return "", map[string]any{}, errors.New("query is empty, please make sure condition input is valid")
+	}
+
+	return query, binds, err
 }
 
 // UglifyQuery is used to remove all formatting from a query
