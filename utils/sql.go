@@ -170,6 +170,25 @@ func UpdateQuery(table string, payload, condition map[string]any) (query string,
 	return query, binds, nil
 }
 
+func DeleteQuery(table string, condition map[string]any) (query string, bind map[string]any, err error) {
+	if table == "" {
+		return "", map[string]any{}, fmt.Errorf("table is empty")
+	}
+	if len(condition) == 0 {
+		return "", map[string]any{}, fmt.Errorf("condition is empty")
+	}
+
+	conditionQuery, conditionBind, err := ConditionQuery(condition)
+	if err != nil {
+		return "", map[string]any{}, fmt.Errorf("failed build condition: %w", err)
+	}
+	if conditionQuery == "" {
+		return "", map[string]any{}, fmt.Errorf("make sure condition param not empty: %w", err)
+	}
+	query = fmt.Sprintf("DELETE FROM %s WHERE %s", table, conditionQuery)
+	return query, conditionBind, nil
+}
+
 // ConditionQuery is used to build conditional query in mysql
 //
 // e.g. WHERE id=:cond_id AND name=:cond_name

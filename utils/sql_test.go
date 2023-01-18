@@ -271,6 +271,51 @@ func TestUpdateQuery(t *testing.T) {
 	})
 }
 
+func TestDeleteQuery(t *testing.T) {
+
+	type testCase struct {
+		table     string
+		condition map[string]any
+		query     string
+		bind      map[string]any
+	}
+
+	t.Run("success", func(t *testing.T) {
+		testCases := []testCase{
+			{
+				table:     "table",
+				condition: map[string]any{"id": 1},
+				query:     "DELETE FROM table WHERE id=:cond_id",
+				bind:      map[string]any{"cond_id": 1},
+			},
+			{
+				table:     "user",
+				condition: map[string]any{"address": "Denpasar", "nationality": "Indonesia"},
+				query:     "DELETE FROM user WHERE address=:cond_address AND nationality=:cond_nationality",
+				bind:      map[string]any{"cond_address": "Denpasar", "cond_nationality": "Indonesia"},
+			},
+		}
+
+		for index, testCase := range testCases {
+			t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
+				query, bind, err := DeleteQuery(testCase.table, testCase.condition)
+				assert.Nil(t, err)
+				assert.Equal(t, testCase.query, query)
+				assert.Equal(t, testCase.bind, bind)
+			})
+		}
+	})
+
+	t.Run("failed", func(t *testing.T) {
+		_, _, err := DeleteQuery("", map[string]any{"field": 1})
+		assert.NotNil(t, err)
+
+		_, _, err = DeleteQuery("table", map[string]any{})
+		assert.NotNil(t, err)
+	})
+
+}
+
 func TestConditionQuery(t *testing.T) {
 
 	type testCase struct {
