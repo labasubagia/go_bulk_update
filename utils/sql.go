@@ -149,7 +149,7 @@ func UpdateQuery(table string, payload, condition map[string]any) (query string,
 	for _, key := range SortMapKeys(payload) {
 		keyBind := fmt.Sprintf("val_%s", key)
 		val := payload[key]
-		fields = append(fields, fmt.Sprintf("%s=:%s", key, keyBind))
+		fields = append(fields, fmt.Sprintf("%s = :%s", key, keyBind))
 		binds[keyBind] = val
 	}
 
@@ -183,6 +183,43 @@ func DeleteQuery(table string, condition map[string]any) (query string, bind map
 	return query, conditionBind, nil
 }
 
+func SelectQuery(table string, fields []string, condition *map[string]any, paginate *Paginate) (query string, bind map[string]any, err error) {
+	bind = map[string]any{}
+	if table == "" {
+		return "", map[string]any{}, errors.New("table is empty")
+	}
+	if len(fields) == 0 {
+		return "", map[string]any{}, errors.New("fields is empty")
+	}
+	if condition != nil && len(*condition) == 0 {
+		return "", map[string]any{}, errors.New("condition provided but empty")
+	}
+
+	sort.Strings(fields)
+	query = fmt.Sprintf("SELECT %s FROM %s", strings.Join(fields, ", "), table)
+
+	// Condition
+	if condition != nil {
+		conditionQuery, conditionBind, err := ConditionQuery(*condition)
+		if err != nil {
+			return "", map[string]any{}, fmt.Errorf("failed build condition: %w", err)
+		}
+		query = fmt.Sprintf("%s WHERE %s", query, conditionQuery)
+		for k, v := range conditionBind {
+			bind[k] = v
+		}
+	}
+
+	// Pagination
+	if paginate != nil {
+		query = fmt.Sprintf("%s LIMIT :paginate_limit OFFSET :paginate_offset", query)
+		bind["paginate_offset"] = paginate.Offset()
+		bind["paginate_limit"] = paginate.Limit
+	}
+
+	return query, bind, nil
+}
+
 // ConditionQuery is used to build conditional query in mysql
 //
 // e.g. WHERE id=:cond_id AND name=:cond_name
@@ -204,7 +241,7 @@ func ConditionQuery(condition map[string]any) (query string, binds map[string]an
 			}
 			str = fmt.Sprintf("%s IN (:%s)", key, bindKey)
 		} else {
-			str = fmt.Sprintf("%s=:%s", key, bindKey)
+			str = fmt.Sprintf("%s = :%s", key, bindKey)
 		}
 		cond = append(cond, str)
 		binds[bindKey] = val

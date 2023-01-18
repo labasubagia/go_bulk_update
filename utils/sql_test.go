@@ -234,14 +234,14 @@ func TestUpdateQuery(t *testing.T) {
 				table:     "table",
 				field:     map[string]any{"f1": "1", "f2": "2"},
 				condition: map[string]any{"c1": 1, "c2": 2},
-				query:     "UPDATE table SET f1=:val_f1, f2=:val_f2 WHERE c1=:cond_c1 AND c2=:cond_c2",
+				query:     "UPDATE table SET f1 = :val_f1, f2 = :val_f2 WHERE c1 = :cond_c1 AND c2 = :cond_c2",
 				bind:      map[string]any{"val_f1": "1", "val_f2": "2", "cond_c1": 1, "cond_c2": 2},
 			},
 			{
 				table:     "table",
 				field:     map[string]any{"f1": "1", "f2": "2"},
 				condition: map[string]any{"f1": 1, "f2": 2},
-				query:     "UPDATE table SET f1=:val_f1, f2=:val_f2 WHERE f1=:cond_f1 AND f2=:cond_f2",
+				query:     "UPDATE table SET f1 = :val_f1, f2 = :val_f2 WHERE f1 = :cond_f1 AND f2 = :cond_f2",
 				bind:      map[string]any{"val_f1": "1", "val_f2": "2", "cond_f1": 1, "cond_f2": 2},
 			},
 		}
@@ -285,13 +285,13 @@ func TestDeleteQuery(t *testing.T) {
 			{
 				table:     "table",
 				condition: map[string]any{"id": 1},
-				query:     "DELETE FROM table WHERE id=:cond_id",
+				query:     "DELETE FROM table WHERE id = :cond_id",
 				bind:      map[string]any{"cond_id": 1},
 			},
 			{
 				table:     "user",
 				condition: map[string]any{"address": "Denpasar", "nationality": "Indonesia"},
-				query:     "DELETE FROM user WHERE address=:cond_address AND nationality=:cond_nationality",
+				query:     "DELETE FROM user WHERE address = :cond_address AND nationality = :cond_nationality",
 				bind:      map[string]any{"cond_address": "Denpasar", "cond_nationality": "Indonesia"},
 			},
 		}
@@ -319,6 +319,77 @@ func TestDeleteQuery(t *testing.T) {
 
 }
 
+func TestSelectQuery(t *testing.T) {
+
+	type testCase struct {
+		table     string
+		fields    []string
+		condition *map[string]any
+		paginate  *Paginate
+		query     string
+		bind      map[string]any
+	}
+
+	t.Run("success", func(t *testing.T) {
+		testCases := []testCase{
+			{
+				table:  "table",
+				fields: []string{"field1", "field2"},
+				query:  "SELECT field1, field2 FROM table",
+				bind:   map[string]any{},
+			},
+			{
+				table:     "table",
+				fields:    []string{"field1", "field2"},
+				condition: &map[string]any{"field3": 1},
+				query:     "SELECT field1, field2 FROM table WHERE field3 = :cond_field3",
+				bind:      map[string]any{"cond_field3": 1},
+			},
+			{
+				table:     "table",
+				fields:    []string{"field1", "field2"},
+				condition: &map[string]any{"field3": 1},
+				paginate:  &Paginate{Page: 1, Limit: 10},
+				query: `
+					SELECT
+						field1,
+						field2
+					FROM
+						table
+					WHERE
+						field3 = :cond_field3
+					LIMIT
+						:paginate_limit OFFSET :paginate_offset
+				`,
+				bind: map[string]any{"cond_field3": 1, "paginate_limit": 10, "paginate_offset": 0},
+			},
+		}
+
+		for index, testCase := range testCases {
+			t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
+				query, bind, err := SelectQuery(testCase.table, testCase.fields, testCase.condition, testCase.paginate)
+				assert.Nil(t, err)
+				assert.Equal(t, UglifyQuery(testCase.query), UglifyQuery(query))
+				assert.Equal(t, testCase.bind, bind)
+			})
+		}
+	})
+
+	t.Run("failed", func(t *testing.T) {
+		_, _, err := SelectQuery("", []string{"f1", "f2"}, nil, nil)
+		assert.NotNil(t, err)
+
+		_, _, err = SelectQuery("table", []string{}, nil, nil)
+		assert.NotNil(t, err)
+
+		_, _, err = SelectQuery("table", []string{"f1", "f2"}, &map[string]any{}, nil)
+		assert.NotNil(t, err)
+
+		_, _, err = SelectQuery("table", []string{"f1", "f2"}, &map[string]any{"ids": []int{}}, nil)
+		assert.NotNil(t, err)
+	})
+}
+
 func TestConditionQuery(t *testing.T) {
 
 	type testCase struct {
@@ -331,12 +402,12 @@ func TestConditionQuery(t *testing.T) {
 		testCases := []testCase{
 			{
 				condition: map[string]any{"c1": 1, "c2": 2},
-				query:     "c1=:cond_c1 AND c2=:cond_c2",
+				query:     "c1 = :cond_c1 AND c2 = :cond_c2",
 				bind:      map[string]any{"cond_c1": 1, "cond_c2": 2},
 			},
 			{
 				condition: map[string]any{"c1": 1, "c2": 2, "c3": []int{1, 2}, "c4": []int{}},
-				query:     "c1=:cond_c1 AND c2=:cond_c2 AND c3 IN (:cond_c3)",
+				query:     "c1 = :cond_c1 AND c2 = :cond_c2 AND c3 IN (:cond_c3)",
 				bind:      map[string]any{"cond_c1": 1, "cond_c2": 2, "cond_c3": []int{1, 2}},
 			},
 		}
