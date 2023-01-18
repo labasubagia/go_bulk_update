@@ -27,3 +27,20 @@ func TestPagedData(t *testing.T) {
 		})
 	}
 }
+
+func TestOffset(t *testing.T) {
+	type testCase struct {
+		page, limit, offset int
+	}
+	testCases := []testCase{
+		{page: 1, limit: 10, offset: 0},
+		{page: 3, limit: 3, offset: 6},
+		{page: 5, limit: 2, offset: 8},
+	}
+	for index, testCase := range testCases {
+		t.Run(fmt.Sprintf("TestCase %d", index+1), func(t *testing.T) {
+			paginate := Paginate{Page: testCase.page, Limit: testCase.limit}
+			assert.Equal(t, paginate.Offset(), testCase.offset)
+		})
+	}
+}
