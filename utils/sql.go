@@ -158,9 +158,6 @@ func UpdateQuery(table string, payload, condition map[string]any) (query string,
 	if err != nil {
 		return query, binds, fmt.Errorf("failed to build update query, make condition: %w", err)
 	}
-	if conditionQuery == "" {
-		return query, binds, fmt.Errorf("make sure conditional not empty: %w", err)
-	}
 	for key, val := range conditionBind {
 		binds[key] = val
 	}
@@ -181,9 +178,6 @@ func DeleteQuery(table string, condition map[string]any) (query string, bind map
 	conditionQuery, conditionBind, err := ConditionQuery(condition)
 	if err != nil {
 		return "", map[string]any{}, fmt.Errorf("failed build condition: %w", err)
-	}
-	if conditionQuery == "" {
-		return "", map[string]any{}, fmt.Errorf("make sure condition param not empty: %w", err)
 	}
 	query = fmt.Sprintf("DELETE FROM %s WHERE %s", table, conditionQuery)
 	return query, conditionBind, nil

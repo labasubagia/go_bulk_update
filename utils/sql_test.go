@@ -312,6 +312,9 @@ func TestDeleteQuery(t *testing.T) {
 
 		_, _, err = DeleteQuery("table", map[string]any{})
 		assert.NotNil(t, err)
+
+		_, _, err = DeleteQuery("table", map[string]any{"ids": []int{}})
+		assert.NotNil(t, err)
 	})
 
 }
