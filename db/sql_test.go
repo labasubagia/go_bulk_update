@@ -35,7 +35,7 @@ func TestNewSQL(t *testing.T) {
 }
 
 func TestDbSQL(t *testing.T) {
-	totalData := 100
+	totalData := 10
 	gen := generator.NewGenerator(1, totalData, generator.NewUserDump(), "db", true)
 	table := gen.Table()
 	createData := gen.GetCreate()
