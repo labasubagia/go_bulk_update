@@ -10,6 +10,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Make sure data source name exists
+const dataSourceName = "root:root@(localhost:3307)/test_db"
+
+func TestNewSQL(t *testing.T) {
+	t.Run("failed", func(t *testing.T) {
+		_, err := NewSQL("", 1, 1)
+		assert.NotNil(t, err)
+
+		_, err = NewSQL("non_exists:non_exists@(non_exists:404)/non_exists", 1, 1)
+		assert.NotNil(t, err)
+
+		_, err = NewSQL(dataSourceName, 0, 1)
+		assert.NotNil(t, err)
+
+		_, err = NewSQL(dataSourceName, 1, 0)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		_, err := NewSQL(dataSourceName, 1, 1)
+		assert.Nil(t, err)
+	})
+}
+
 func TestDbSQL(t *testing.T) {
 	totalData := 100
 	gen := generator.NewGenerator(1, totalData, generator.NewUserDump(), "db", true)
@@ -19,7 +43,7 @@ func TestDbSQL(t *testing.T) {
 	fieldSize := gen.FieldCount()
 	primaryKey := gen.Primary()
 
-	db, err := NewSQL("root:root@(localhost:3307)/test_db", runtime.NumCPU(), 200)
+	db, err := NewSQL(dataSourceName, runtime.NumCPU(), 200)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,12 +53,26 @@ func TestDbSQL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("test create", func(t *testing.T) {
-		err := db.CreateBulk(table, createData, fieldSize)
-		assert.Nil(t, err)
+	t.Run("create", func(t *testing.T) {
+
+		t.Run("failed", func(t *testing.T) {
+			err := db.CreateBulk("", createData, fieldSize)
+			assert.NotNil(t, err)
+
+			err = db.CreateBulk(table, []map[string]any{}, fieldSize)
+			assert.NotNil(t, err)
+
+			err = db.CreateBulk(table, createData, 0)
+			assert.NotNil(t, err)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			err := db.CreateBulk(table, createData, fieldSize)
+			assert.Nil(t, err)
+		})
 	})
 
-	t.Run("test update", func(t *testing.T) {
+	t.Run("update", func(t *testing.T) {
 		keyEdit := []string{primaryKey}
 
 		updateFnCount := 3
@@ -43,17 +81,87 @@ func TestDbSQL(t *testing.T) {
 			t.Fatal("make sure paged data correct")
 		}
 
-		err := db.UpdateBulk(table, paged[0], keyEdit, fieldSize)
-		assert.Nil(t, err)
+		t.Run("bulk", func(t *testing.T) {
+			data := paged[0]
 
-		err = db.UpdateParallel(table, paged[1], keyEdit, fieldSize)
-		assert.Nil(t, err)
+			t.Run("failed", func(t *testing.T) {
+				err := db.UpdateBulk("", data, keyEdit, fieldSize)
+				assert.NotNil(t, err)
 
-		err = db.UpdateSequential(table, paged[2], keyEdit, fieldSize)
-		assert.Nil(t, err)
+				err = db.UpdateBulk(table, []map[string]any{}, keyEdit, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateBulk(table, data, []string{}, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateBulk(table, data, []string{"non_exists"}, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateBulk(table, data, keyEdit, 0)
+				assert.NotNil(t, err)
+			})
+
+			t.Run("success", func(t *testing.T) {
+				err := db.UpdateBulk(table, data, keyEdit, fieldSize)
+				assert.Nil(t, err)
+			})
+		})
+
+		t.Run("parallel", func(t *testing.T) {
+			data := paged[1]
+
+			t.Run("failed", func(t *testing.T) {
+				err := db.UpdateParallel("", data, keyEdit, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateParallel(table, []map[string]any{}, keyEdit, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateParallel(table, data, []string{}, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateParallel(table, data, []string{"non_exists"}, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateParallel(table, data, keyEdit, 0)
+				assert.NotNil(t, err)
+			})
+
+			t.Run("success", func(t *testing.T) {
+				err = db.UpdateParallel(table, data, keyEdit, fieldSize)
+				assert.Nil(t, err)
+			})
+		})
+
+		t.Run("sequential", func(t *testing.T) {
+			data := paged[2]
+
+			t.Run("failed", func(t *testing.T) {
+				err := db.UpdateSequential("", data, keyEdit, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateSequential(table, []map[string]any{}, keyEdit, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateSequential(table, data, []string{}, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateSequential(table, data, []string{"non_exists"}, fieldSize)
+				assert.NotNil(t, err)
+
+				err = db.UpdateSequential(table, data, keyEdit, 0)
+				assert.NotNil(t, err)
+			})
+
+			t.Run("success", func(t *testing.T) {
+				err = db.UpdateSequential(table, data, keyEdit, fieldSize)
+				assert.Nil(t, err)
+			})
+		})
 	})
 
-	t.Run("test delete", func(t *testing.T) {
+	t.Run("delete", func(t *testing.T) {
+
 		primaries := []any{}
 		for _, v := range createData {
 			primary, ok := v[primaryKey]
@@ -62,7 +170,26 @@ func TestDbSQL(t *testing.T) {
 			}
 			primaries = append(primaries, primary)
 		}
-		err := db.Delete(table, map[string]any{primaryKey: primaries})
-		assert.Nil(t, err)
+		condition := map[string]any{primaryKey: primaries}
+
+		t.Run("failed", func(t *testing.T) {
+			err := db.Delete("", condition)
+			assert.NotNil(t, err)
+
+			err = db.Delete(table, map[string]any{})
+			assert.NotNil(t, err)
+
+			err = db.Delete(table, map[string]any{"non_exists": []any{1, 2, 3}})
+			assert.NotNil(t, err)
+
+			err = db.Delete(table, map[string]any{primaryKey: []any{}})
+			assert.NotNil(t, err)
+		})
+
+		t.Run("success", func(t *testing.T) {
+
+			err := db.Delete(table, condition)
+			assert.Nil(t, err)
+		})
 	})
 }
