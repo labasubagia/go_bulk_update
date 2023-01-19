@@ -6,6 +6,7 @@ import "go_update_bulk/utils"
 
 type GenerateDump[T any] interface {
 	Table() string
+	Primary() string
 	Current() T
 	DumpCreate(no int) T
 	DumpUpdate(no int) T
@@ -13,6 +14,7 @@ type GenerateDump[T any] interface {
 
 type Generator interface {
 	Table() string
+	Primary() string
 	FieldCount() int
 	GetCreate() []map[string]any
 	GetUpdate() []map[string]any
@@ -46,6 +48,10 @@ func NewGenerator[T any](start, size int, typ GenerateDump[T], tag string, remov
 		size:       size,
 		removeNil:  removeNil,
 	}
+}
+
+func (g *generator[T]) Primary() string {
+	return g.typ.Primary()
 }
 
 func (g *generator[T]) Table() string {

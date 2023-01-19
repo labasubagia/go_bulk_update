@@ -21,6 +21,10 @@ func (u *User) Table() string {
 	return "user"
 }
 
+func (u *User) Primary() string {
+	return "id"
+}
+
 func (u *User) Current() User {
 	return *u
 }

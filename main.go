@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 type BulkUpdateOption struct {

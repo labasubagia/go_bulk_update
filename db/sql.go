@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go_update_bulk/utils"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/sync/semaphore"
 )
@@ -17,6 +18,7 @@ type SQL interface {
 	UpdateParallel(table string, data []map[string]any, keyEdits []string, fieldSize int) error
 	UpdateSequential(table string, data []map[string]any, keyEdits []string, fieldSize int) error
 	Update(table string, data, condition map[string]any) error
+	Delete(table string, condition map[string]any) error
 	EmptyTable(table string) error
 	Close() error
 }
@@ -296,6 +298,36 @@ func (s *sql) Update(table string, data, condition map[string]any) error {
 	_, err = s.db.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed update: %w", err)
+	}
+
+	return nil
+}
+
+func (s *sql) Delete(table string, condition map[string]any) error {
+	if table == "" {
+		return errors.New("table is empty")
+	}
+	if len(condition) == 0 {
+		return errors.New("condition is empty")
+	}
+
+	query, binds, err := utils.DeleteQuery(table, condition)
+	if err != nil {
+		return fmt.Errorf("failed build query: %w", err)
+	}
+	query, args, err := sqlx.Named(query, binds)
+	if err != nil {
+		return fmt.Errorf("failed bind named: %w", err)
+	}
+
+	query, args, err = sqlx.In(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed bindVar: %w", err)
+	}
+
+	_, err = s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed delete: %w", err)
 	}
 
 	return nil
