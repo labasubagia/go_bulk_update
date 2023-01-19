@@ -54,11 +54,15 @@ func TestDbSQL(t *testing.T) {
 	})
 
 	t.Run("test delete", func(t *testing.T) {
-		ids := []int{}
+		primaries := []any{}
 		for _, v := range createData {
-			ids = append(ids, v[primaryKey].(int))
+			primary, ok := v[primaryKey]
+			if !ok {
+				t.Fatal("make sure primary key exist in data")
+			}
+			primaries = append(primaries, primary)
 		}
-		err := db.Delete(table, map[string]any{primaryKey: ids})
+		err := db.Delete(table, map[string]any{primaryKey: primaries})
 		assert.Nil(t, err)
 	})
 }
