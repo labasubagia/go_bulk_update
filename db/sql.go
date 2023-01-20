@@ -19,6 +19,7 @@ type SQL interface {
 	UpdateSequential(table string, data []map[string]any, keyEdits []string, fieldSize int) error
 	Update(table string, data, condition map[string]any) error
 	Delete(table string, condition map[string]any) error
+	Select(dest any, table string, fields []string, condition *map[string]any, paginate *utils.Paginate) error
 	EmptyTable(table string) error
 	Close() error
 }
@@ -328,6 +329,35 @@ func (s *sql) Delete(table string, condition map[string]any) error {
 	_, err = s.db.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed delete: %w", err)
+	}
+
+	return nil
+}
+
+func (s *sql) Select(dest any, table string, fields []string, condition *map[string]any, paginate *utils.Paginate) error {
+	if table == "" {
+		return errors.New("table is empty")
+	}
+	if len(fields) == 0 {
+		return errors.New("fields is empty")
+	}
+
+	query, bind, err := utils.SelectQuery(table, fields, condition, paginate)
+	if err != nil {
+		return fmt.Errorf("failed to build query: %w", err)
+	}
+	query, args, err := sqlx.Named(query, bind)
+	if err != nil {
+		return fmt.Errorf("failed bind named: %w", err)
+	}
+
+	query, args, err = sqlx.In(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed bindVar: %w", err)
+	}
+
+	if err := s.db.Select(dest, query, args...); err != nil {
+		return fmt.Errorf("failed to select data: %w", err)
 	}
 
 	return nil

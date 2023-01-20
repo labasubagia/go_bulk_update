@@ -1,6 +1,8 @@
 package generator
 
-import "go_update_bulk/utils"
+import (
+	"go_update_bulk/utils"
+)
 
 // Generator is only use to generate data for test purpose
 

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"go_update_bulk/generator"
 	"go_update_bulk/utils"
 	"math"
@@ -8,10 +9,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+func toString(data any) string {
+	bytes, _ := json.MarshalIndent(data, "", "\t")
+	return string(bytes)
+}
+
 // Make sure data source name exists
-const dataSourceName = "root:root@(localhost:3307)/test_db"
+const dataSourceName = "root:root@(localhost:3307)/test_db?parseTime=true"
 
 func TestNewSQL(t *testing.T) {
 	t.Run("failed", func(t *testing.T) {
@@ -43,6 +50,16 @@ func TestDbSQL(t *testing.T) {
 	fieldSize := gen.FieldCount()
 	primaryKey := gen.Primary()
 
+	// condition
+	primaries := []any{}
+	for _, v := range createData {
+		primary, ok := v[primaryKey]
+		require.True(t, ok)
+		primaries = append(primaries, primary)
+	}
+	condition := map[string]any{primaryKey: primaries}
+
+	// Init db
 	db, err := NewSQL(dataSourceName, runtime.NumCPU(), 200)
 	if err != nil {
 		t.Fatal(err)
@@ -69,6 +86,33 @@ func TestDbSQL(t *testing.T) {
 		t.Run("success", func(t *testing.T) {
 			err := db.CreateBulk(table, createData, fieldSize)
 			assert.Nil(t, err)
+
+			data := []generator.User{}
+			err = db.Select(&data, table, []string{"*"}, &map[string]any{primaryKey: primaries}, nil)
+			mapped, _ := utils.StructsToMaps(data, "db", true)
+			assert.Nil(t, err)
+			assert.Len(t, data, totalData)
+			assert.Equal(t, createData, mapped)
+
+		})
+	})
+
+	t.Run("select", func(t *testing.T) {
+		data := []generator.User{}
+		t.Run("failed", func(t *testing.T) {
+			err := db.Select(data, "", []string{"*"}, nil, nil)
+			assert.NotNil(t, err)
+
+			err = db.Select(data, table, []string{}, nil, nil)
+			assert.NotNil(t, err)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			err = db.Select(&data, table, []string{"*"}, &map[string]any{primaryKey: primaries}, nil)
+			mapped, _ := utils.StructsToMaps(data, "db", true)
+			assert.Nil(t, err)
+			assert.Len(t, data, totalData)
+			assert.Equal(t, createData, mapped)
 		})
 	})
 
@@ -76,13 +120,19 @@ func TestDbSQL(t *testing.T) {
 		keyEdit := []string{primaryKey}
 
 		updateFnCount := 3
-		paged := utils.PagedData(updateData, int(math.Ceil(float64(totalData)/float64(updateFnCount))))
-		if len(paged) != updateFnCount {
-			t.Fatal("make sure paged data correct")
-		}
+		pageSize := int(math.Ceil(float64(totalData) / float64(updateFnCount)))
+		pagedData := utils.PagedData(updateData, pageSize)
+		pagedPrimary := utils.PagedData(primaries, pageSize)
+
+		selectedFields := []string{"age", "name", "address", "updated_at"}
+
+		assert.Len(t, pagedData, updateFnCount)
+		assert.Equal(t, len(pagedData), len(pagedPrimary))
 
 		t.Run("bulk", func(t *testing.T) {
-			data := paged[0]
+			t.Parallel()
+			data := pagedData[0]
+			primaries := pagedPrimary[0]
 
 			t.Run("failed", func(t *testing.T) {
 				err := db.UpdateBulk("", data, keyEdit, fieldSize)
@@ -104,11 +154,20 @@ func TestDbSQL(t *testing.T) {
 			t.Run("success", func(t *testing.T) {
 				err := db.UpdateBulk(table, data, keyEdit, fieldSize)
 				assert.Nil(t, err)
+
+				dest := []generator.User{}
+				err = db.Select(&dest, table, selectedFields, &map[string]any{primaryKey: primaries}, nil)
+				mapped, _ := utils.StructsToMaps(dest, "db", true)
+				require.Nil(t, err)
+				assert.Len(t, dest, len(data))
+				assert.Equal(t, toString(data), toString(mapped))
 			})
 		})
 
 		t.Run("parallel", func(t *testing.T) {
-			data := paged[1]
+			t.Parallel()
+			data := pagedData[1]
+			primaries := pagedPrimary[1]
 
 			t.Run("failed", func(t *testing.T) {
 				err := db.UpdateParallel("", data, keyEdit, fieldSize)
@@ -130,11 +189,20 @@ func TestDbSQL(t *testing.T) {
 			t.Run("success", func(t *testing.T) {
 				err = db.UpdateParallel(table, data, keyEdit, fieldSize)
 				assert.Nil(t, err)
+
+				dest := []generator.User{}
+				err = db.Select(&dest, table, selectedFields, &map[string]any{primaryKey: primaries}, nil)
+				mapped, _ := utils.StructsToMaps(dest, "db", true)
+				require.Nil(t, err)
+				assert.Len(t, dest, len(data))
+				assert.Equal(t, toString(data), toString(mapped))
 			})
 		})
 
 		t.Run("sequential", func(t *testing.T) {
-			data := paged[2]
+			t.Parallel()
+			data := pagedData[2]
+			primaries := pagedPrimary[2]
 
 			t.Run("failed", func(t *testing.T) {
 				err := db.UpdateSequential("", data, keyEdit, fieldSize)
@@ -156,21 +224,18 @@ func TestDbSQL(t *testing.T) {
 			t.Run("success", func(t *testing.T) {
 				err = db.UpdateSequential(table, data, keyEdit, fieldSize)
 				assert.Nil(t, err)
+
+				dest := []generator.User{}
+				err = db.Select(&dest, table, selectedFields, &map[string]any{primaryKey: primaries}, nil)
+				mapped, _ := utils.StructsToMaps(dest, "db", true)
+				require.Nil(t, err)
+				assert.Len(t, dest, len(data))
+				assert.Equal(t, toString(data), toString(mapped))
 			})
 		})
 	})
 
 	t.Run("delete", func(t *testing.T) {
-
-		primaries := []any{}
-		for _, v := range createData {
-			primary, ok := v[primaryKey]
-			if !ok {
-				t.Fatal("make sure primary key exist in data")
-			}
-			primaries = append(primaries, primary)
-		}
-		condition := map[string]any{primaryKey: primaries}
 
 		t.Run("failed", func(t *testing.T) {
 			err := db.Delete("", condition)

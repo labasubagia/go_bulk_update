@@ -43,7 +43,7 @@ func (u *User) DumpCreate(no int) User {
 func (u *User) DumpUpdate(no int) User {
 	name := fmt.Sprintf("Edited Name %d", no)
 	address := fmt.Sprintf("Edited Address %d", no)
-	now := time.Now()
+	now := time.Now().UTC().Truncate(time.Second)
 	return User{
 		ID:        &no,
 		Age:       &no,
