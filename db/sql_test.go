@@ -117,42 +117,54 @@ func TestDbSQL(t *testing.T) {
 	})
 
 	t.Run("update", func(t *testing.T) {
-		keyEdit := []string{primaryKey}
+		functions := []struct {
+			name string
+			fn   func(table string, data []map[string]any, keyEdits []string, fieldSize int) error
+		}{
+			{name: "bulk", fn: db.UpdateBulk},
+			{name: "sequential", fn: db.UpdateSequential},
+			{name: "parallel", fn: db.UpdateParallel},
+		}
 
-		updateFnCount := 3
+		keyEdit := []string{primaryKey}
+		selectedFields := []string{"age", "name", "address", "updated_at"}
+		updateFnCount := len(functions)
+
 		pageSize := int(math.Ceil(float64(totalData) / float64(updateFnCount)))
 		pagedData := utils.PagedData(updateData, pageSize)
 		pagedPrimary := utils.PagedData(primaries, pageSize)
 
-		selectedFields := []string{"age", "name", "address", "updated_at"}
-
 		assert.Len(t, pagedData, updateFnCount)
 		assert.Equal(t, len(pagedData), len(pagedPrimary))
 
-		t.Run("bulk", func(t *testing.T) {
-			t.Parallel()
-			data := pagedData[0]
-			primaries := pagedPrimary[0]
+		for index, v := range functions {
+			item := v
+			data := pagedData[index]
+			primaries := pagedPrimary[index]
 
-			t.Run("failed", func(t *testing.T) {
-				err := db.UpdateBulk("", data, keyEdit, fieldSize)
-				assert.NotNil(t, err)
+			t.Run(item.name, func(t *testing.T) {
+				t.Parallel()
 
-				err = db.UpdateBulk(table, []map[string]any{}, keyEdit, fieldSize)
-				assert.NotNil(t, err)
+				t.Run("failed", func(t *testing.T) {
+					err := item.fn("", data, keyEdit, fieldSize)
+					assert.NotNil(t, err)
 
-				err = db.UpdateBulk(table, data, []string{}, fieldSize)
-				assert.NotNil(t, err)
+					err = item.fn(table, []map[string]any{}, keyEdit, fieldSize)
+					assert.NotNil(t, err)
 
-				err = db.UpdateBulk(table, data, []string{"non_exists"}, fieldSize)
-				assert.NotNil(t, err)
+					err = item.fn(table, data, []string{}, fieldSize)
+					assert.NotNil(t, err)
 
-				err = db.UpdateBulk(table, data, keyEdit, 0)
-				assert.NotNil(t, err)
+					err = item.fn(table, data, []string{"non_exists"}, fieldSize)
+					assert.NotNil(t, err)
+
+					err = item.fn(table, data, keyEdit, 0)
+					assert.NotNil(t, err)
+				})
 			})
 
 			t.Run("success", func(t *testing.T) {
-				err := db.UpdateBulk(table, data, keyEdit, fieldSize)
+				err := item.fn(table, data, keyEdit, fieldSize)
 				assert.Nil(t, err)
 
 				dest := []generator.User{}
@@ -162,77 +174,7 @@ func TestDbSQL(t *testing.T) {
 				assert.Len(t, dest, len(data))
 				assert.Equal(t, toString(data), toString(mapped))
 			})
-		})
-
-		t.Run("parallel", func(t *testing.T) {
-			t.Parallel()
-			data := pagedData[1]
-			primaries := pagedPrimary[1]
-
-			t.Run("failed", func(t *testing.T) {
-				err := db.UpdateParallel("", data, keyEdit, fieldSize)
-				assert.NotNil(t, err)
-
-				err = db.UpdateParallel(table, []map[string]any{}, keyEdit, fieldSize)
-				assert.NotNil(t, err)
-
-				err = db.UpdateParallel(table, data, []string{}, fieldSize)
-				assert.NotNil(t, err)
-
-				err = db.UpdateParallel(table, data, []string{"non_exists"}, fieldSize)
-				assert.NotNil(t, err)
-
-				err = db.UpdateParallel(table, data, keyEdit, 0)
-				assert.NotNil(t, err)
-			})
-
-			t.Run("success", func(t *testing.T) {
-				err = db.UpdateParallel(table, data, keyEdit, fieldSize)
-				assert.Nil(t, err)
-
-				dest := []generator.User{}
-				err = db.Select(&dest, table, selectedFields, &map[string]any{primaryKey: primaries}, nil)
-				mapped, _ := utils.StructsToMaps(dest, "db", true)
-				require.Nil(t, err)
-				assert.Len(t, dest, len(data))
-				assert.Equal(t, toString(data), toString(mapped))
-			})
-		})
-
-		t.Run("sequential", func(t *testing.T) {
-			t.Parallel()
-			data := pagedData[2]
-			primaries := pagedPrimary[2]
-
-			t.Run("failed", func(t *testing.T) {
-				err := db.UpdateSequential("", data, keyEdit, fieldSize)
-				assert.NotNil(t, err)
-
-				err = db.UpdateSequential(table, []map[string]any{}, keyEdit, fieldSize)
-				assert.NotNil(t, err)
-
-				err = db.UpdateSequential(table, data, []string{}, fieldSize)
-				assert.NotNil(t, err)
-
-				err = db.UpdateSequential(table, data, []string{"non_exists"}, fieldSize)
-				assert.NotNil(t, err)
-
-				err = db.UpdateSequential(table, data, keyEdit, 0)
-				assert.NotNil(t, err)
-			})
-
-			t.Run("success", func(t *testing.T) {
-				err = db.UpdateSequential(table, data, keyEdit, fieldSize)
-				assert.Nil(t, err)
-
-				dest := []generator.User{}
-				err = db.Select(&dest, table, selectedFields, &map[string]any{primaryKey: primaries}, nil)
-				mapped, _ := utils.StructsToMaps(dest, "db", true)
-				require.Nil(t, err)
-				assert.Len(t, dest, len(data))
-				assert.Equal(t, toString(data), toString(mapped))
-			})
-		})
+		}
 	})
 
 	t.Run("delete", func(t *testing.T) {
