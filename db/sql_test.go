@@ -46,12 +46,22 @@ func TestDbSQL(t *testing.T) {
 	removeNil := true
 	tag := "db"
 
-	gen := generator.NewGenerator(1, totalData, generator.NewUserDump(), tag, removeNil)
+	// types
+	type Type = generator.User
+	dump := generator.NewUserDump()
+
+	// generator
+	gen := generator.NewGenerator(1, totalData, dump, tag, removeNil)
 	table := gen.Table()
 	createData := gen.GetCreate()
 	updateData := gen.GetUpdate()
 	fieldSize := gen.FieldCount()
 	primaryKey := gen.Primary()
+
+	selectedFieldOnCreate := []string{"*"}
+
+	keyEdit := []string{primaryKey}
+	selectedFieldOnEdit := []string{"age", "name", "address", "updated_at"}
 
 	// condition
 	primaries := []any{}
@@ -89,20 +99,20 @@ func TestDbSQL(t *testing.T) {
 			err := db.CreateBulk(table, createData, fieldSize)
 			assert.Nil(t, err)
 
-			data := []generator.User{}
-			err = db.Select(&data, table, []string{"*"}, &map[string]any{primaryKey: primaries}, nil)
+			data := []Type{}
+			err = db.Select(&data, table, selectedFieldOnCreate, &map[string]any{primaryKey: primaries}, nil)
 			mapped, _ := utils.StructsToMaps(data, tag, removeNil)
 			assert.Nil(t, err)
 			assert.Len(t, data, totalData)
-			assert.Equal(t, createData, mapped)
+			assert.Equal(t, toString(createData), toString(mapped))
 
 		})
 	})
 
 	t.Run("select", func(t *testing.T) {
-		data := []generator.User{}
+		data := []Type{}
 		t.Run("failed", func(t *testing.T) {
-			err := db.Select(data, "", []string{"*"}, nil, nil)
+			err := db.Select(data, "", selectedFieldOnCreate, nil, nil)
 			assert.NotNil(t, err)
 
 			err = db.Select(data, table, []string{}, nil, nil)
@@ -110,11 +120,11 @@ func TestDbSQL(t *testing.T) {
 		})
 
 		t.Run("success", func(t *testing.T) {
-			err = db.Select(&data, table, []string{"*"}, &map[string]any{primaryKey: primaries}, nil)
-			mapped, _ := utils.StructsToMaps(data, "db", removeNil)
+			err = db.Select(&data, table, selectedFieldOnCreate, &map[string]any{primaryKey: primaries}, nil)
+			mapped, _ := utils.StructsToMaps(data, tag, removeNil)
 			assert.Nil(t, err)
 			assert.Len(t, data, totalData)
-			assert.Equal(t, createData, mapped)
+			assert.Equal(t, toString(createData), toString(mapped))
 		})
 	})
 
@@ -128,8 +138,6 @@ func TestDbSQL(t *testing.T) {
 			{name: "parallel", fn: db.UpdateParallel},
 		}
 
-		keyEdit := []string{primaryKey}
-		selectedFields := []string{"age", "name", "address", "updated_at"}
 		updateFnCount := len(functions)
 
 		pageSize := int(math.Ceil(float64(totalData) / float64(updateFnCount)))
@@ -168,8 +176,8 @@ func TestDbSQL(t *testing.T) {
 					err := item.fn(table, data, keyEdit, fieldSize)
 					assert.Nil(t, err)
 
-					dest := []generator.User{}
-					err = db.Select(&dest, table, selectedFields, &map[string]any{primaryKey: primaries}, nil)
+					dest := []Type{}
+					err = db.Select(&dest, table, selectedFieldOnEdit, &map[string]any{primaryKey: primaries}, nil)
 					mapped, _ := utils.StructsToMaps(dest, tag, removeNil)
 					require.Nil(t, err)
 					assert.Len(t, dest, len(data))
